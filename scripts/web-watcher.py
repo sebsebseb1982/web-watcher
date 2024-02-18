@@ -1,6 +1,8 @@
 import subprocess
 import os
 import http.client, urllib
+import schedule
+import time
 from lxml import html
 from dotenv import load_dotenv
 
@@ -51,7 +53,14 @@ def extract_value(response_body:str, xpath:str) -> CrawlResult:
     )
 
 
-Job(
-    "https://www.amazon.fr/Dreame-Aspirateur-Autonettoyante-Automatique-dobstacles/dp/B0B8X43GQH/",
-    '//div[@id="corePrice_feature_div"]//div[@class="a-spacing-top-mini"]//span[@class="a-price-whole"]/text()'
-).launch()
+def test():
+    Job(
+        "https://www.amazon.fr/Dreame-Aspirateur-Autonettoyante-Automatique-dobstacles/dp/B0B8X43GQH/",
+        '//div[@id="corePrice_feature_div"]//div[@class="a-spacing-top-mini"]//span[@class="a-price-whole"]/text()'
+    ).launch()
+
+schedule.every(1).minutes.do(test)
+
+while True:
+    schedule.run_pending()
+    time.sleep(1)
