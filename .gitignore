@@ -1,0 +1,4 @@
+.env.private
+.env
+build
+Web_Watcher.egg-info
