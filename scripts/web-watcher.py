@@ -10,6 +10,18 @@ load_dotenv()
 PUSHOVER_USER = os.getenv('PUSHOVER_USER')
 PUSHOVER_TOKEN = os.getenv('PUSHOVER_TOKEN')
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+
 class CrawlResult:
     def __init__(self, value: str, page_title:str):
         self.value = value
@@ -42,15 +54,29 @@ class Job:
 
 def crawl_url(url: str) -> str:
     result = subprocess.run(["google-chrome-stable", "--headless", "--no-sandbox", "--disable-gpu", "--dump-dom", url], stdout=subprocess.PIPE)
+    print_result(f"Crawl {url}", result.returncode==0)
     return result.stdout.decode()
 
 
 def extract_value(response_body:str, xpath:str) -> CrawlResult:
     tree = html.fromstring(response_body)
-    return CrawlResult(
-        tree.xpath(xpath)[0],
-        tree.xpath('//title/text()')[0]
-    )
+    value=tree.xpath(xpath)
+    pageTitle=tree.xpath('//title/text()')
+    if value and pageTitle:
+        print_result(f"Extract value", True)
+        return CrawlResult(
+            value[0],
+            pageTitle[0]
+        )
+    else:
+        print_result(f"Extract value", False)
+        return None
+
+def print_result(message:str, ok:bool):
+    if ok:
+        print(f"{bcolors.OKGREEN}[OK]{bcolors.ENDC} {message}")
+    else:
+        print(f"{bcolors.FAIL}[KO]{bcolors.ENDC} {message}")
 
 
 #def test():
