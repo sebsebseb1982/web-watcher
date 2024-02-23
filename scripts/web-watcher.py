@@ -5,10 +5,15 @@ import schedule
 import time
 from lxml import html
 from dotenv import load_dotenv
+from selenium import webdriver
+from selenium.webdriver.firefox.options import Options
 
 load_dotenv()
 PUSHOVER_USER = os.getenv('PUSHOVER_USER')
 PUSHOVER_TOKEN = os.getenv('PUSHOVER_TOKEN')
+CRAWL_PERIOD_IN_MINUTES = os.getenv('CRAWL_PERIOD_IN_MINUTES', 15)
+URL_TO_CRAWL = os.getenv('URL_TO_CRAWL')
+XPATH = os.getenv('XPATH')
 
 class bcolors:
     HEADER = '\033[95m'
@@ -32,6 +37,7 @@ class Job:
     def __init__(self, url: str, xpath:str):
         self.url = url
         self.xpath = xpath
+        self.previousValue=""
 
     def launch(self):
         self.notify(extract_value(
@@ -40,22 +46,42 @@ class Job:
         ))
 
     def notify(self, crawl_result:CrawlResult):
-        print(crawl_result.__dict__)
-        conn = http.client.HTTPSConnection("api.pushover.net:443")
-        conn.request("POST", "/1/messages.json",
-        urllib.parse.urlencode({
-            "token": PUSHOVER_TOKEN,
-            "user": PUSHOVER_USER,
-            "message": f"Prix {crawl_result.value}€\n{self.url}",
-            "title": crawl_result.page_title
-        }), { "Content-type": "application/x-www-form-urlencoded" })
-        conn.getresponse()
+        if crawl_result is None:
+            conn = http.client.HTTPSConnection("api.pushover.net:443")
+            conn.request("POST", "/1/messages.json",
+            urllib.parse.urlencode({
+                "token": PUSHOVER_TOKEN,
+                "user": PUSHOVER_USER,
+                "message": f"Impossible de crawler {self.url} avec le selecteur {self.xpath}",
+                "title": "Erreur"
+            }), { "Content-type": "application/x-www-form-urlencoded" })
+            conn.getresponse()
+        else :
+            print(crawl_result.__dict__)
+            message= f"Prix {crawl_result.value}€\n{self.url}"
+            title= crawl_result.page_title
+            if self.previousValue is not crawl_result.value:
+                self.previousValue=crawl_result.value
+                conn = http.client.HTTPSConnection("api.pushover.net:443")
+                conn.request("POST", "/1/messages.json",
+                urllib.parse.urlencode({
+                    "token": PUSHOVER_TOKEN,
+                    "user": PUSHOVER_USER,
+                    "message": message,
+                    "title": f"Nouvelle valeur pour {title[:20]}..."
+                }), { "Content-type": "application/x-www-form-urlencoded" })
+                conn.getresponse()
 
 
 def crawl_url(url: str) -> str:
-    result = subprocess.run(["google-chrome-stable", "--headless", "--no-sandbox", "--disable-gpu", "--dump-dom", url], stdout=subprocess.PIPE)
-    print_result(f"Crawl {url}", result.returncode==0)
-    return result.stdout.decode()
+    print(f"GET {url}")
+    options=Options()
+    options.add_argument("--headless")
+    driver = webdriver.Firefox(options=options)
+    driver.get(url)
+    html= driver.page_source
+    driver.quit()
+    return html
 
 
 def extract_value(response_body:str, xpath:str) -> CrawlResult:
@@ -79,19 +105,20 @@ def print_result(message:str, ok:bool):
         print(f"{bcolors.FAIL}[KO]{bcolors.ENDC} {message}")
 
 
-#def test():
-#    Job(
-#        "https://www.amazon.fr/Dreame-Aspirateur-Autonettoyante-Automatique-dobstacles/dp/B0B8X43GQH/",
-#        '//div[@id="corePrice_feature_div"]//div[@class="a-spacing-top-mini"]//span[@class="a-price-whole"]/text()'
-#    ).launch()
-#
-#schedule.every(1).minutes.do(test)
-#
-#while True:
-#    schedule.run_pending()
-#    time.sleep(1)
+def test():
+    Job(
+        URL_TO_CRAWL,
+        XPATH
+    ).launch()
+
+schedule.every(int(CRAWL_PERIOD_IN_MINUTES)).minutes.do(test)
 
 Job(
-    "https://www.amazon.fr/Dreame-Aspirateur-Autonettoyante-Automatique-dobstacles/dp/B0B8X43GQH/",
-    '//div[@id="corePrice_feature_div"]//div[@class="a-spacing-top-mini"]//span[@class="a-price-whole"]/text()'
-).launch()
+        URL_TO_CRAWL,
+        XPATH
+    ).launch()
+
+
+while True:
+    schedule.run_pending()
+    time.sleep(1)

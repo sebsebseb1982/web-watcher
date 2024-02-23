@@ -3,3 +3,4 @@ build
 .env.private
 .gitignore
 dockerfile
+*.tar
