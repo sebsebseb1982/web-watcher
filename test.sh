@@ -1,2 +1,3 @@
 #!/bin/sh
-docker run --env-file ./.env web-watcher 
+version=$(cat version.txt)
+docker run --env-file ./.env web-watcher:$version 

@@ -3,10 +3,14 @@ import os
 import http.client, urllib
 import schedule
 import time
+import string
+import random
 from lxml import html
 from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.firefox.firefox_profile import FirefoxProfile
+from pathlib2 import Path
 
 load_dotenv()
 PUSHOVER_USER = os.getenv('PUSHOVER_USER')
@@ -58,7 +62,7 @@ class Job:
             conn.getresponse()
         else :
             print(crawl_result.__dict__)
-            message= f"Prix {crawl_result.value}€\n{self.url}"
+            message= f"Nouvelle valeur : {crawl_result.value}\n{self.url}"
             title= crawl_result.page_title
             if self.previousValue is not crawl_result.value:
                 self.previousValue=crawl_result.value
@@ -72,10 +76,16 @@ class Job:
                 }), { "Content-type": "application/x-www-form-urlencoded" })
                 conn.getresponse()
 
+def randomword(length):
+   letters = string.ascii_lowercase
+   return ''.join(random.choice(letters) for i in range(length))
 
 def crawl_url(url: str) -> str:
     print(f"GET {url}")
+    profile = FirefoxProfile()
+    profile.set_preference("general.useragent.override", randomword(8))
     options=Options()
+    options.profile=profile
     options.add_argument("--headless")
     driver = webdriver.Firefox(options=options)
     driver.get(url)
@@ -110,6 +120,10 @@ def test():
         URL_TO_CRAWL,
         XPATH
     ).launch()
+
+
+version = Path('version.txt').read_text()
+print(f"Web Watcher v{version}")
 
 schedule.every(int(CRAWL_PERIOD_IN_MINUTES)).minutes.do(test)
 
