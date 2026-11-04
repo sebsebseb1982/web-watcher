@@ -19,7 +19,7 @@
     <header class="mb-8">
       <div class="flex items-center gap-3">
         <h1 class="bg-linear-to-r from-indigo-300 via-sky-300 to-emerald-300 bg-clip-text text-4xl font-bold tracking-tight text-transparent">Web Watcher</h1>
-        <span class="rounded-full border border-indigo-400/30 bg-indigo-500/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-indigo-200">v2</span>
+        <span id="app-version" class="rounded-full border border-indigo-400/30 bg-indigo-500/10 px-2.5 py-1 text-xs font-semibold tracking-wider text-indigo-200"></span>
       </div>
       <p class="mt-1 text-sm text-slate-400">Intervalle de vérification par défaut : <span id="default-interval" class="font-medium text-slate-300"></span></p>
     </header>
@@ -73,7 +73,6 @@
     const msg = document.getElementById('msg');
     let defaultInterval = 3600;
     let minInterval = 5;
-    let appVersion = '2.0.0';
     let watches = [];
 
     const el = (tag, props = {}, ...children) => {
@@ -182,12 +181,12 @@
     });
 
     api('/api/config').then(c => {
-      appVersion = c.version || appVersion;
       defaultInterval = c.default_interval_seconds;
       minInterval = c.min_interval_seconds;
       form.elements.interval.title = `Vide = intervalle par défaut, minimum ${minInterval} s`;
       document.getElementById('default-interval').textContent = fmt(defaultInterval);
-      document.title = `Web Watcher v${appVersion.split('.')[0]}`;
+      document.getElementById('app-version').textContent = `v${c.version}`;
+      document.title = `Web Watcher v${c.version}`;
       load();
     });
     setInterval(load, 5000);
