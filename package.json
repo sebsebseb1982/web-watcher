@@ -1,0 +1,21 @@
+{
+  "name": "web-watcher",
+  "version": "1.0.0",
+  "description": "Surveille la valeur d'un élément (sélecteur CSS) sur des pages web",
+  "type": "module",
+  "main": "dist/server.js",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node --use-env-proxy --disable-warning=ExperimentalWarning dist/server.js"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}

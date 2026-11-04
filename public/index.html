@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="fr" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Web Watcher</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👁</text></svg>">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style type="text/tailwindcss">
+    @utility field { @apply w-full rounded-lg bg-slate-800/70 px-3 py-2 text-slate-100 placeholder-slate-500 ring-1 ring-slate-700 outline-none transition focus:ring-2 focus:ring-indigo-500; }
+    @utility btn { @apply inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:cursor-wait disabled:opacity-50 cursor-pointer; }
+    @utility btn-primary { @apply btn bg-indigo-600 text-white shadow-lg shadow-indigo-900/40 hover:bg-indigo-500; }
+    @utility btn-ghost { @apply btn text-slate-300 ring-1 ring-slate-700 hover:bg-slate-800 hover:text-white; }
+    @utility btn-danger { @apply btn text-rose-300 ring-1 ring-rose-900/60 hover:bg-rose-950 hover:text-rose-200; }
+  </style>
+</head>
+<body class="min-h-full bg-slate-950 bg-[radial-gradient(ellipse_at_top,rgba(79,70,229,0.25),transparent_60%)] text-slate-200 antialiased">
+  <main class="mx-auto max-w-6xl px-4 py-10">
+    <header class="mb-8">
+      <h1 class="bg-linear-to-r from-indigo-300 via-sky-300 to-emerald-300 bg-clip-text text-4xl font-bold tracking-tight text-transparent">Web Watcher</h1>
+      <p class="mt-1 text-sm text-slate-400">Intervalle de vérification par défaut : <span id="default-interval" class="font-medium text-slate-300"></span></p>
+    </header>
+
+    <details class="group mb-4 rounded-2xl bg-slate-900/60 ring-1 ring-slate-800 backdrop-blur">
+      <summary class="flex cursor-pointer list-none items-center justify-between px-5 py-3 font-medium text-slate-200">
+        <span>🔔 Notifications Pushover <span id="po-status" class="ml-2 rounded-full px-2 py-0.5 text-xs"></span></span>
+        <span class="text-slate-500 transition group-open:rotate-180">▾</span>
+      </summary>
+      <form id="settings" class="grid gap-3 border-t border-slate-800 p-5 md:grid-cols-4">
+        <input name="pushover_user" type="password" autocomplete="off" placeholder="Clé utilisateur" aria-label="Clé utilisateur Pushover" class="field md:col-span-2">
+        <input name="pushover_token" type="password" autocomplete="off" placeholder="Jeton d'application (API token)" aria-label="Jeton d'application Pushover" class="field md:col-span-2">
+        <label class="flex items-center gap-2 text-sm text-slate-300 md:col-span-2">
+          <input name="pushover_enabled" type="checkbox" class="size-4 accent-indigo-500"> Notifier lors d'un changement de valeur
+        </label>
+        <div class="flex gap-2 md:col-span-2 md:justify-end">
+          <button type="button" id="po-test" class="btn-ghost py-2">Envoyer un test</button>
+          <button type="submit" class="btn-primary py-2">Enregistrer</button>
+        </div>
+        <p id="po-msg" class="text-sm md:col-span-4"></p>
+      </form>
+    </details>
+
+    <form id="form" class="mb-2 grid gap-3 rounded-2xl bg-slate-900/60 p-5 ring-1 ring-slate-800 backdrop-blur md:grid-cols-4">
+      <input name="name" placeholder="Nom (optionnel)" class="field">
+      <input name="group_name" placeholder="Groupe (optionnel)" list="groups" class="field">
+      <input name="url" type="url" placeholder="https://exemple.com/produit" required class="field md:col-span-2">
+      <input name="selector" placeholder="Sélecteur CSS (ex. .price)" required class="field font-mono md:col-span-2">
+      <div class="flex gap-2">
+        <input name="interval" type="number" min="1" placeholder="Intervalle" aria-label="Intervalle" class="field">
+        <select name="unit" aria-label="Unité" class="field w-auto">
+          <option value="60">min</option>
+          <option value="1">s</option>
+        </select>
+      </div>
+      <div class="flex gap-2">
+        <button type="submit" id="submit" class="btn-primary flex-1 justify-center py-2">Ajouter</button>
+        <button type="reset" id="cancel" class="btn-ghost py-2" hidden>Annuler</button>
+      </div>
+      <input type="hidden" name="id">
+    </form>
+    <datalist id="groups"></datalist>
+    <p id="msg" class="mb-4 min-h-6 text-sm text-rose-400"></p>
+
+    <div id="list" class="space-y-6"></div>
+  </main>
+
+  <script>
+    const form = document.getElementById('form');
+    const list = document.getElementById('list');
+    const msg = document.getElementById('msg');
+    let defaultInterval = 3600;
+    let minInterval = 5;
+    let watches = [];
+
+    const el = (tag, props = {}, ...children) => {
+      const e = Object.assign(document.createElement(tag), props);
+      e.append(...children);
+      return e;
+    };
+    const fmt = s => s % 60 === 0 ? `${s / 60} min` : `${s} s`;
+
+    async function api(path, opts = {}) {
+      const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts });
+      if (res.status === 204) return null;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      return data;
+    }
+
+    const checkWatch = w => api(`/api/watches/${w.id}/check`, { method: 'POST' });
+    const btn = (label, className, fn) => el('button', {
+      textContent: label, className,
+      onclick: async e => { e.target.disabled = true; await fn(); e.target.disabled = false; },
+    });
+
+    function row(w) {
+      return el('tr', { className: 'border-t border-slate-800 transition hover:bg-slate-800/40' },
+        el('td', { className: 'max-w-xs px-4 py-3' },
+          el('div', { className: 'font-medium text-slate-100', textContent: w.name || '(sans nom)' }),
+          el('a', { href: w.url, target: '_blank', rel: 'noopener noreferrer', textContent: w.url,
+            className: 'block truncate text-xs text-sky-400 hover:underline', title: w.url })),
+        el('td', { className: 'px-4 py-3' }, el('code', { textContent: w.selector,
+          className: 'rounded bg-slate-800 px-1.5 py-0.5 text-xs text-amber-300' })),
+        el('td', { className: 'px-4 py-3' },
+          el('div', { className: 'text-lg font-semibold text-emerald-300', textContent: w.value ?? '—' }),
+          w.error ? el('div', { className: 'mt-0.5 text-xs text-rose-400', textContent: `⚠ ${w.error}` }) : ''),
+        el('td', { className: 'px-4 py-3 text-sm text-slate-400',
+          textContent: w.last_checked ? new Date(w.last_checked).toLocaleString('fr-FR') : 'Jamais' }),
+        el('td', { className: 'px-4 py-3 text-sm' }, w.interval_seconds
+          ? el('span', { className: 'text-slate-300', textContent: fmt(w.interval_seconds) })
+          : el('span', { className: 'text-slate-500', textContent: `${fmt(defaultInterval)} (défaut)` })),
+        el('td', { className: 'px-4 py-3' }, el('div', { className: 'flex justify-end gap-1.5' },
+          btn('Vérifier', 'btn-ghost', () => run(() => checkWatch(w))),
+          btn('Modifier', 'btn-ghost', () => edit(w)),
+          btn('Supprimer', 'btn-danger', () => confirm('Supprimer cette surveillance ?') && run(() => api(`/api/watches/${w.id}`, { method: 'DELETE' }))))));
+    }
+
+    function render() {
+      const groups = Map.groupBy(watches, w => w.group_name);
+      document.getElementById('groups').replaceChildren(...[...groups.keys()].filter(Boolean).map(g => el('option', { value: g })));
+      if (!watches.length) {
+        list.replaceChildren(el('p', { className: 'rounded-2xl border border-dashed border-slate-700 p-10 text-center text-slate-500',
+          textContent: 'Aucune surveillance. Ajoutez une URL et un sélecteur CSS ci-dessus.' }));
+        return;
+      }
+      list.replaceChildren(...[...groups].map(([group, items]) =>
+        el('section', { className: 'overflow-hidden rounded-2xl bg-slate-900/60 ring-1 ring-slate-800 backdrop-blur' },
+          el('div', { className: 'flex items-center justify-between gap-3 border-b border-slate-800 bg-slate-900/80 px-4 py-3' },
+            el('h2', { className: 'flex items-center gap-2 font-semibold text-slate-100' },
+              group || 'Sans groupe',
+              el('span', { className: 'rounded-full bg-indigo-500/20 px-2 py-0.5 text-xs text-indigo-300', textContent: items.length })),
+            btn('Vérifier le groupe', 'btn-ghost', () => run(() => Promise.all(items.map(checkWatch))))),
+          el('div', { className: 'overflow-x-auto' }, el('table', { className: 'w-full text-left' },
+            el('thead', { className: 'text-xs uppercase tracking-wider text-slate-500' }, el('tr', {},
+              ...['Nom / URL', 'Sélecteur', 'Valeur actuelle', 'Dernière vérification', 'Intervalle', '']
+                .map(h => el('th', { className: 'px-4 py-2 font-medium', textContent: h })))),
+            el('tbody', {}, ...items.map(row)))))));
+    }
+
+    function edit(w) {
+      for (const k of ['id', 'name', 'group_name', 'url', 'selector']) form.elements[k].value = w[k] ?? '';
+      const s = w.interval_seconds;
+      form.elements.unit.value = s && s % 60 !== 0 ? '1' : '60';
+      form.elements.interval.value = s ? s / Number(form.elements.unit.value) : '';
+      form.elements.submit.textContent = 'Enregistrer';
+      form.elements.cancel.hidden = false;
+      form.scrollIntoView({ behavior: 'smooth' });
+      form.elements.url.focus();
+    }
+
+    async function load() {
+      watches = await api('/api/watches');
+      render();
+    }
+
+    async function run(fn) {
+      msg.textContent = '';
+      try { await fn(); } catch (e) { msg.textContent = e.message; }
+      await load();
+    }
+
+    form.addEventListener('reset', () => {
+      form.elements.id.value = '';
+      form.elements.submit.textContent = 'Ajouter';
+      form.elements.cancel.hidden = true;
+    });
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const { id, interval, unit, ...data } = Object.fromEntries(new FormData(form));
+      data.interval_seconds = interval === '' ? null : Number(interval) * Number(unit);
+      form.elements.submit.disabled = true;
+      await run(async () => {
+        await api(id ? `/api/watches/${id}` : '/api/watches', { method: id ? 'PUT' : 'POST', body: JSON.stringify(data) });
+        form.reset();
+      });
+      form.elements.submit.disabled = false;
+    });
+
+    api('/api/config').then(c => {
+      defaultInterval = c.default_interval_seconds;
+      minInterval = c.min_interval_seconds;
+      form.elements.interval.title = `Vide = intervalle par défaut, minimum ${minInterval} s`;
+      document.getElementById('default-interval').textContent = fmt(defaultInterval);
+      load();
+    });
+    setInterval(load, 5000);
+
+    const settings = document.getElementById('settings');
+    const poMsg = document.getElementById('po-msg');
+    const poInfo = (text, ok) => { poMsg.textContent = text; poMsg.className = `text-sm md:col-span-4 ${ok ? 'text-emerald-400' : 'text-rose-400'}`; };
+
+    function showSettings(s) {
+      const keys = s.pushover_token_set && s.pushover_user_set;
+      settings.elements.pushover_enabled.checked = s.pushover_enabled;
+      settings.elements.pushover_user.placeholder = s.pushover_user_set ? 'Clé utilisateur •••• (enregistrée)' : 'Clé utilisateur';
+      settings.elements.pushover_token.placeholder = s.pushover_token_set ? 'Jeton •••• (enregistré)' : "Jeton d'application (API token)";
+      const status = document.getElementById('po-status');
+      status.textContent = !keys ? 'non configuré' : s.pushover_enabled ? 'actif' : 'désactivé';
+      status.className = `ml-2 rounded-full px-2 py-0.5 text-xs ${keys && s.pushover_enabled ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-700/60 text-slate-400'}`;
+    }
+
+    settings.addEventListener('submit', async e => {
+      e.preventDefault();
+      const f = settings.elements;
+      try {
+        showSettings(await api('/api/settings', { method: 'PUT', body: JSON.stringify({
+          pushover_user: f.pushover_user.value, pushover_token: f.pushover_token.value, pushover_enabled: f.pushover_enabled.checked }) }));
+        f.pushover_user.value = f.pushover_token.value = '';
+        poInfo('Réglages enregistrés.', true);
+      } catch (err) { poInfo(err.message); }
+    });
+
+    document.getElementById('po-test').addEventListener('click', async e => {
+      e.target.disabled = true;
+      try { await api('/api/settings/test', { method: 'POST' }); poInfo('Notification de test envoyée.', true); }
+      catch (err) { poInfo(err.message); }
+      e.target.disabled = false;
+    });
+
+    api('/api/settings').then(showSettings);
+  </script>
+</body>
+</html>

@@ -1,6 +1,5 @@
-build
-.env
-.env.private
-.gitignore
-dockerfile
-*.tar
+node_modules
+data
+.playwright-mcp
+.git
+dist
