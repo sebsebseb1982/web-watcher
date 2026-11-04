@@ -34,19 +34,28 @@ const MIN_INTERVAL = 5;
 const MAX_CONCURRENT_CHECKS = 3;
 const PUBLIC_DIR = path.join(import.meta.dirname, '..', 'public');
 let browser: Browser | null = null;
+let browserLaunch: Promise<Browser> | null = null;
 
-async function getBrowser(): Promise<Browser> {
-  if (browser) return browser;
-  try {
-    browser = await firefox.launch({ headless: true });
-  } catch (error) {
-    browser = null;
-    throw new Error(`Impossible de démarrer Firefox : ${errorMessage(error)}`);
+function getBrowser(): Promise<Browser> {
+  if (browser) return Promise.resolve(browser);
+  if (!browserLaunch) {
+    browserLaunch = firefox.launch({ headless: true })
+      .then(instance => {
+        browser = instance;
+        return instance;
+      })
+      .catch(error => {
+        browserLaunch = null;
+        throw new Error(`Impossible de démarrer Firefox : ${errorMessage(error)}`);
+      });
   }
-  return browser;
+  return browserLaunch;
 }
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
+const browserTempDir = path.resolve(DATA_DIR, '.tmp');
+fs.mkdirSync(browserTempDir, { recursive: true });
+if (process.platform !== 'win32') process.env.TMPDIR = browserTempDir;
 const db = new DatabaseSync(path.join(DATA_DIR, 'watches.db'));
 db.exec(`CREATE TABLE IF NOT EXISTS watches (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
