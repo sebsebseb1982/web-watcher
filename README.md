@@ -1,6 +1,8 @@
-# Web Watcher
+# Web Watcher v2
 
 Application web qui surveille la valeur d'un élément (prix, stock, texte…) sur des pages web, repéré par un sélecteur CSS.
+
+Version 2 : mise à jour du branding et des métadonnées de version de l'application.
 
 ## Fonctionnalités
 
@@ -38,7 +40,7 @@ Derrière un proxy, ajouter `-e HTTPS_PROXY=... -e HTTP_PROXY=... -e NO_PROXY=..
 
 ### Publication sur Docker Hub
 
-Le workflow GitHub Actions publie `web-watcher` sur Docker Hub à chaque push sur `master` ou d'un tag `v*`. Il construit les images `linux/amd64` et `linux/arm64`, avec les tags `latest` (branche par défaut), `sha-<commit>` et le nom du tag Git.
+Le workflow GitHub Actions publie `web-watcher` sur Docker Hub à chaque push sur `master` ou d'un tag `v*`. Il construit les images `linux/amd64` et `linux/arm64`, avec les tags `latest` (branche par défaut), `sha-<commit>`, le tag Git (`v2.0.0`, etc.), ainsi que les variantes `2.0.0` et `2` quand le tag suit le schéma semver.
 
 Configurez les secrets du dépôt `DOCKERHUB_USERNAME` et `DOCKERHUB_TOKEN` (un access token Docker Hub) pour autoriser la publication.
 

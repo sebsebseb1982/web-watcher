@@ -1,6 +1,6 @@
 {
   "name": "web-watcher",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Surveille la valeur d'un élément (sélecteur CSS) sur des pages web",
   "type": "module",
   "main": "dist/server.js",

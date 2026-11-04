@@ -26,6 +26,7 @@ interface WatchInput {
 
 type RequestBody = Record<string, unknown>;
 
+const APP_VERSION = '2.0.0';
 const PORT = Number(process.env.PORT) || 3000;
 const DATA_DIR = process.env.DATA_DIR || './data';
 const DEFAULT_INTERVAL = Number(process.env.DEFAULT_INTERVAL_SECONDS) || 3600;
@@ -214,7 +215,11 @@ const server = http.createServer(async (req, res) => {
   const { pathname } = new URL(req.url ?? '/', 'http://localhost');
   try {
     if (pathname === '/api/config' && req.method === 'GET') {
-      return send(res, 200, { default_interval_seconds: DEFAULT_INTERVAL, min_interval_seconds: MIN_INTERVAL });
+      return send(res, 200, {
+        version: APP_VERSION,
+        default_interval_seconds: DEFAULT_INTERVAL,
+        min_interval_seconds: MIN_INTERVAL,
+      });
     }
 
     // Les clés ne sont jamais renvoyées au navigateur, seulement leur présence.
@@ -280,5 +285,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => console.log(
-  `web-watcher sur http://localhost:${PORT} (intervalle par défaut : ${DEFAULT_INTERVAL} s)`,
+  `web-watcher v${APP_VERSION} sur http://localhost:${PORT} (intervalle par défaut : ${DEFAULT_INTERVAL} s)`,
 ));
