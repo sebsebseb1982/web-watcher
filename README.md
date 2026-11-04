@@ -41,6 +41,8 @@ docker run -d --name web-watcher -p 3000:3000 -v web-watcher-data:/data web-watc
 
 Derrière un proxy, ajouter `-e HTTPS_PROXY=... -e HTTP_PROXY=... -e NO_PROXY=...` (déjà pris en compte grâce à `NODE_USE_ENV_PROXY=1`).
 
+Avec un système de fichiers racine en lecture seule (par exemple `readOnlyRootFilesystem: true` sous Kubernetes), `/data` et `/tmp` doivent rester accessibles en écriture à l'utilisateur du conteneur (UID/GID `1000`). Monter un volume persistant sur `/data` et un volume éphémère `emptyDir` sur `/tmp`. L'image définit `HOME=/tmp` et `TMPDIR=/tmp` : Firefox doit pouvoir créer ses fichiers de configuration et de cache en plus de son profil temporaire. Ne pas remplacer `HOME` par un dossier en lecture seule tel que `/home/node`.
+
 ### Publication sur Docker Hub
 
 Les commits Conventional Commits poussés sur `master` déclenchent une version SemVer et une release GitHub : `fix:`, `perf:` et `revert:` publient une version corrective, `feat:` une version mineure, et un changement avec `!` ou `BREAKING CHANGE:` une version majeure. Le workflow publie cette version sur Docker Hub sous les tags `vX.Y.Z`, `X.Y.Z` et `X` (ainsi que `latest` et `sha-<commit>`). Les autres types de commits ne créent pas de version.
