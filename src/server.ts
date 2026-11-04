@@ -26,7 +26,10 @@ interface WatchInput {
 
 type RequestBody = Record<string, unknown>;
 
-const APP_VERSION = '2.0.0';
+const packageVersion = (JSON.parse(
+  fs.readFileSync(path.join(import.meta.dirname, '..', 'package.json'), 'utf8'),
+) as { version: string }).version;
+const APP_VERSION = process.env.APP_VERSION || packageVersion;
 const PORT = Number(process.env.PORT) || 3000;
 const DATA_DIR = process.env.DATA_DIR || './data';
 const DEFAULT_INTERVAL = Number(process.env.DEFAULT_INTERVAL_SECONDS) || 3600;
