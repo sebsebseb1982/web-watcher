@@ -9,7 +9,7 @@ RUN npm run build
 FROM node:24-bookworm-slim
 WORKDIR /app
 ARG APP_VERSION
-ENV NODE_ENV=production DATA_DIR=/data PORT=3000 NODE_USE_ENV_PROXY=1 PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+ENV NODE_ENV=production DATA_DIR=/data PORT=3000 NODE_USE_ENV_PROXY=1 PLAYWRIGHT_BROWSERS_PATH=/ms-playwright TMPDIR=/tmp
 ENV APP_VERSION=${APP_VERSION}
 COPY package*.json ./
 RUN npm ci --omit=dev

@@ -56,9 +56,6 @@ function getBrowser(): Promise<Browser> {
 }
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
-const browserTempDir = path.resolve(DATA_DIR, '.tmp');
-fs.mkdirSync(browserTempDir, { recursive: true });
-if (process.platform !== 'win32') process.env.TMPDIR = browserTempDir;
 const db = new DatabaseSync(path.join(DATA_DIR, 'watches.db'));
 db.exec(`CREATE TABLE IF NOT EXISTS watches (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
