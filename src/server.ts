@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync, type SQLOutputValue } from 'node:sqlite';
-import { firefox } from 'playwright';
+import { firefox, type Browser } from 'playwright';
 
 interface Watch {
   id: number;
@@ -33,7 +33,18 @@ const DEFAULT_INTERVAL = Number(process.env.DEFAULT_INTERVAL_SECONDS) || 3600;
 const MIN_INTERVAL = 5;
 const MAX_CONCURRENT_CHECKS = 3;
 const PUBLIC_DIR = path.join(import.meta.dirname, '..', 'public');
-const browser = await firefox.launch({ headless: true });
+let browser: Browser | null = null;
+
+async function getBrowser(): Promise<Browser> {
+  if (browser) return browser;
+  try {
+    browser = await firefox.launch({ headless: true });
+  } catch (error) {
+    browser = null;
+    throw new Error(`Impossible de démarrer Firefox : ${errorMessage(error)}`);
+  }
+  return browser;
+}
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 const db = new DatabaseSync(path.join(DATA_DIR, 'watches.db'));
@@ -153,14 +164,15 @@ function validate(body: RequestBody): WatchInput {
 async function check(watch: Watch): Promise<Watch | undefined> {
   let value: string | null = null;
   let error: string | null = null;
-  let context: Awaited<ReturnType<typeof browser.newContext>> | undefined;
+  let context: Awaited<ReturnType<Browser['newContext']>> | undefined;
   try {
     const url = new URL(watch.url);
     const proxyServer = url.protocol === 'https:'
       ? process.env.HTTPS_PROXY ?? process.env.https_proxy ?? process.env.HTTP_PROXY ?? process.env.http_proxy
       : process.env.HTTP_PROXY ?? process.env.http_proxy ?? process.env.HTTPS_PROXY ?? process.env.https_proxy;
     const proxyBypass = process.env.NO_PROXY ?? process.env.no_proxy;
-    context = await browser.newContext({
+    const browserInstance = await getBrowser();
+    context = await browserInstance.newContext({
       proxy: proxyServer ? { server: proxyServer, ...(proxyBypass && { bypass: proxyBypass }) } : undefined,
     });
     const page = await context.newPage();
