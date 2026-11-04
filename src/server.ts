@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync, type SQLOutputValue } from 'node:sqlite';
-import * as cheerio from 'cheerio';
+import { chromium } from 'playwright';
 
 interface Watch {
   id: number;
@@ -31,7 +31,9 @@ const PORT = Number(process.env.PORT) || 3000;
 const DATA_DIR = process.env.DATA_DIR || './data';
 const DEFAULT_INTERVAL = Number(process.env.DEFAULT_INTERVAL_SECONDS) || 3600;
 const MIN_INTERVAL = 5;
+const MAX_CONCURRENT_CHECKS = 3;
 const PUBLIC_DIR = path.join(import.meta.dirname, '..', 'public');
+const browser = await chromium.launch({ headless: true });
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 const db = new DatabaseSync(path.join(DATA_DIR, 'watches.db'));
@@ -151,21 +153,33 @@ function validate(body: RequestBody): WatchInput {
 async function check(watch: Watch): Promise<Watch | undefined> {
   let value: string | null = null;
   let error: string | null = null;
+  let context: Awaited<ReturnType<typeof browser.newContext>> | undefined;
   try {
-    const res = await fetch(watch.url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      },
-      signal: AbortSignal.timeout(20000),
+    const url = new URL(watch.url);
+    const proxyServer = url.protocol === 'https:'
+      ? process.env.HTTPS_PROXY ?? process.env.https_proxy ?? process.env.HTTP_PROXY ?? process.env.http_proxy
+      : process.env.HTTP_PROXY ?? process.env.http_proxy ?? process.env.HTTPS_PROXY ?? process.env.https_proxy;
+    const proxyBypass = process.env.NO_PROXY ?? process.env.no_proxy;
+    context = await browser.newContext({
+      proxy: proxyServer ? { server: proxyServer, ...(proxyBypass && { bypass: proxyBypass }) } : undefined,
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const $ = cheerio.load(await res.text());
-    const el = $(watch.selector).first();
-    if (!el.length) throw new Error('Élément introuvable');
-    value = el.text().replace(/\s+/g, ' ').trim();
+    const page = await context.newPage();
+    const response = await page.goto(watch.url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+    if (response && !response.ok()) throw new Error(`HTTP ${response.status()}`);
+    const element = page.locator(watch.selector).first();
+    try {
+      await element.waitFor({ state: 'attached', timeout: 5000 });
+    } catch (e) {
+      if (e instanceof Error && e.name === 'TimeoutError') throw new Error('Élément introuvable');
+      throw e;
+    }
+    const text = await element.textContent();
+    if (text === null) throw new Error('Élément introuvable');
+    value = text.replace(/\s+/g, ' ').trim();
   } catch (e) {
     error = errorMessage(e);
+  } finally {
+    await context?.close();
   }
   db.prepare('UPDATE watches SET value = COALESCE(?, value), error = ?, last_checked = ? WHERE id = ?')
     .run(value, error, new Date().toISOString(), watch.id);
@@ -183,6 +197,7 @@ async function tick(): Promise<void> {
   for (const watch of watches) {
     const interval = (watch.interval_seconds ?? DEFAULT_INTERVAL) * 1000;
     if (running.has(watch.id) || (watch.last_checked && now - Date.parse(watch.last_checked) < interval)) continue;
+    if (running.size >= MAX_CONCURRENT_CHECKS) break;
     running.add(watch.id);
     check(watch).finally(() => running.delete(watch.id));
   }

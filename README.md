@@ -13,7 +13,7 @@ Version 2 : mise à jour du branding et des métadonnées de version de l'applic
 - Notifications [Pushover](https://pushover.net) lors d'un changement de valeur ; clés saisies depuis l'interface (jamais renvoyées au navigateur), avec bouton d'envoi de test.
 - Interface sombre en Tailwind CSS (chargé via CDN).
 
-> La page est récupérée en HTML brut (pas de navigateur) : les valeurs générées en JavaScript côté client ne sont pas visibles.
+> Les pages sont chargées dans Chromium headless : les éléments générés en JavaScript peuvent être surveillés. Certains sites refusent toujours les accès automatisés (HTTP 403) ; le navigateur ne contourne pas ces blocages.
 
 ## Prérequis
 
@@ -23,6 +23,7 @@ Version 2 : mise à jour du branding et des métadonnées de version de l'applic
 
 ```bash
 npm install
+npx playwright install chromium
 npm run build
 npm start
 ```
@@ -30,6 +31,8 @@ npm start
 Puis ouvrir http://localhost:3000.
 
 ### Docker
+
+L'image installe Chromium et ses dépendances système ; elle est plus volumineuse que l'image précédente.
 
 ```bash
 docker build -f dockerfile -t web-watcher .
