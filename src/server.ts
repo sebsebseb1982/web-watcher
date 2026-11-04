@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync, type SQLOutputValue } from 'node:sqlite';
-import { chromium } from 'playwright';
+import { firefox } from 'playwright';
 
 interface Watch {
   id: number;
@@ -33,7 +33,7 @@ const DEFAULT_INTERVAL = Number(process.env.DEFAULT_INTERVAL_SECONDS) || 3600;
 const MIN_INTERVAL = 5;
 const MAX_CONCURRENT_CHECKS = 3;
 const PUBLIC_DIR = path.join(import.meta.dirname, '..', 'public');
-const browser = await chromium.launch({ headless: true });
+const browser = await firefox.launch({ headless: true });
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 const db = new DatabaseSync(path.join(DATA_DIR, 'watches.db'));

@@ -13,7 +13,7 @@ Version 2 : mise à jour du branding et des métadonnées de version de l'applic
 - Notifications [Pushover](https://pushover.net) lors d'un changement de valeur ; clés saisies depuis l'interface (jamais renvoyées au navigateur), avec bouton d'envoi de test.
 - Interface sombre en Tailwind CSS (chargé via CDN).
 
-> Les pages sont chargées dans Chromium headless : les éléments générés en JavaScript peuvent être surveillés. Certains sites refusent toujours les accès automatisés (HTTP 403) ; le navigateur ne contourne pas ces blocages.
+> Les pages sont chargées dans Firefox headless : les éléments générés en JavaScript peuvent être surveillés. Certains sites refusent toujours les accès automatisés (HTTP 403) ; le navigateur ne contourne pas ces blocages.
 
 ## Prérequis
 
@@ -23,7 +23,7 @@ Version 2 : mise à jour du branding et des métadonnées de version de l'applic
 
 ```bash
 npm install
-npx playwright install chromium
+npx playwright install firefox
 npm run build
 npm start
 ```
@@ -32,7 +32,7 @@ Puis ouvrir http://localhost:3000.
 
 ### Docker
 
-L'image installe Chromium et ses dépendances système ; elle est plus volumineuse que l'image précédente.
+L'image installe Firefox et ses dépendances système ; elle est plus volumineuse que l'image précédente.
 
 ```bash
 docker build -f dockerfile -t web-watcher .
@@ -43,7 +43,11 @@ Derrière un proxy, ajouter `-e HTTPS_PROXY=... -e HTTP_PROXY=... -e NO_PROXY=..
 
 ### Publication sur Docker Hub
 
-Le workflow GitHub Actions publie `web-watcher` sur Docker Hub à chaque push sur `master` ou d'un tag `v*`. Il construit les images `linux/amd64` et `linux/arm64`, avec les tags `latest` (branche par défaut), `sha-<commit>`, le tag Git (`v2.0.0`, etc.), ainsi que les variantes `2.0.0` et `2` quand le tag suit le schéma semver.
+Les commits Conventional Commits poussés sur `master` déclenchent une version SemVer et une release GitHub : `fix:`, `perf:` et `revert:` publient une version corrective, `feat:` une version mineure, et un changement avec `!` ou `BREAKING CHANGE:` une version majeure. Le workflow publie cette version sur Docker Hub sous les tags `vX.Y.Z`, `X.Y.Z` et `X` (ainsi que `latest` et `sha-<commit>`). Les autres types de commits ne créent pas de version.
+
+Le workflow Docker publie aussi à chaque push sur `master` ou d'un tag `v*`. Il construit les images `linux/amd64` et `linux/arm64`, avec les tags `latest` (branche par défaut), `sha-<commit>`, le tag Git (`v2.0.0`, etc.), ainsi que les variantes `2.0.0` et `2` quand le tag suit le schéma semver.
+
+Avant la première version automatique, créez et poussez le tag de départ correspondant à la version actuellement publiée (par exemple `v2.0.0`) sur son commit de release. Les versions suivantes seront calculées à partir des commits Conventional Commits depuis ce tag.
 
 Configurez les secrets du dépôt `DOCKERHUB_USERNAME` et `DOCKERHUB_TOKEN` (un access token Docker Hub) pour autoriser la publication.
 

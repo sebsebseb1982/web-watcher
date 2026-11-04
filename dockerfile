@@ -11,7 +11,7 @@ WORKDIR /app
 ENV NODE_ENV=production DATA_DIR=/data PORT=3000 NODE_USE_ENV_PROXY=1 PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 COPY package*.json ./
 RUN npm ci --omit=dev
-RUN npx playwright install --with-deps chromium && chmod -R a+rX /ms-playwright
+RUN npx playwright install --with-deps firefox && chmod -R a+rX /ms-playwright
 COPY --from=build /app/dist ./dist
 COPY public ./public
 RUN mkdir -p /data && chown node:node /data
